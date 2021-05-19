@@ -1,5 +1,11 @@
-use crate::M2x2;
-use crate::M2x1;
+type M2x1 = (
+    (f32,),
+    (f32,)
+);
+type M2x2 = (
+    (f32, f32),
+    (f32, f32)
+);
 
 
 fn dot_2x2_2x1(a: &M2x2, b: &M2x1) -> M2x1 {

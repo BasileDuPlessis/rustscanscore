@@ -1,12 +1,13 @@
 use image::{ImageBuffer, Rgb};
 
 
-
 pub fn line() -> Result<(), std::io::Error> {
 
     let mut img = ImageBuffer::from_fn(512, 512, |_x, _y| {
         image::Rgb([255, 255, 255])
     });
+
+    
 
     let measurements = sample_line_gen();
     let mut measurement_iter = measurements.iter();
