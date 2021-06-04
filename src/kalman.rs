@@ -1,8 +1,8 @@
-type M2x1 = (
+pub type M2x1 = (
     (f32,),
     (f32,)
 );
-type M2x2 = (
+pub type M2x2 = (
     (f32, f32),
     (f32, f32)
 );
@@ -51,8 +51,8 @@ fn inv_2x2(a: &M2x2) -> M2x2 {
     if det == 0.0 {panic!("Could not inverse matrix with determinant equal to zero");}
 
     (
-        (a.1.1 / det, -a.1.0 / det),
-        (-a.0.1 / det, a.0.0 / det)
+        (a.1.1 / det, -a.0.1 / det),
+        (-a.1.0 / det, a.0.0 / det)
     )
 }
 
@@ -110,7 +110,6 @@ pub fn update(x: &M2x1, p: &M2x2, y: &M2x1, h: &M2x2, r: &M2x2) -> (M2x1, M2x2) 
             &dot_2x2(&h, &p)
         )
     );
-
     (x, p)
 }
 
@@ -241,6 +240,19 @@ mod test {
             (2.0, 2.0)
         );        
         inv_2x2(&a);
+    }
+
+    #[test]
+    fn test_inv_2x2() {
+        let a = (
+            (5.0, 4.0),
+            (2.0, 2.0)
+        );  
+        let res = (
+            (1.0, -2.0),
+            (-1.0, 2.5)
+        ); 
+        assert_eq!(inv_2x2(&a), res);
     }
     
 

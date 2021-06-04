@@ -1,7 +1,7 @@
-use image::{ImageBuffer, Rgb};
+use image::{ImageBuffer, Rgb, ImageError};
 
 
-pub fn line() -> Result<(), std::io::Error> {
+pub fn line() -> Result<(), ImageError> {
 
     let mut img = ImageBuffer::from_fn(512, 512, |_x, _y| {
         image::Rgb([255, 255, 255])
@@ -39,14 +39,14 @@ pub fn line() -> Result<(), std::io::Error> {
     let mut vec = Vec::<(u32, u32, u32)>::new();
     vec.push((dt as u32, last_measure as u32, last_measure as u32));
 
+    let a = (
+        (1.0, 1.0),
+        (0.0, 1.0)
+    );
 
     for measure in measurement_iter {
 
-        let a = (
-            (1.0, 1.0),
-            (0.0, 1.0)
-        );
-
+        
         let (t_x, t_p) = crate::kalman::predict(&x, &p, &a);
         x = t_x;
         p = t_p;
@@ -71,11 +71,11 @@ pub fn line() -> Result<(), std::io::Error> {
     }
 
     for p in vec {
-        img.put_pixel(p.0, p.1, Rgb([255, 0, 0])); 
-        img.put_pixel(p.0, p.2, Rgb([0, 0, 255]));                
+        img.put_pixel(p.0, p.1, Rgb::<u8>([255, 0, 0])); 
+        img.put_pixel(p.0, p.2, Rgb::<u8>([0, 0, 255]));                
     }
 
-    img.save("score/simulated_kalman_filter.png")
+    img.save("score_sample/simulated_kalman_filter.png")
 }
 
 fn sample_line_gen() -> Vec<f32> {
