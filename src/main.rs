@@ -48,42 +48,36 @@ fn main() {
 
     let staves = Vec::<Staff>::new();
 
-    let pixels = buffer_x
-        .iter()
-        .enumerate()
-        .map(|(id, y)| (id % height, id / height, y))
-        .collect::<Vec<(usize, usize, &u8)>>();
 
-    for (y, pixels_chunk)
-        in pixels.chunks(height).enumerate() {
+    for (y, buff) in buffer_x.chunks(height).enumerate() {
         
-        let predicts = staves
+        let predictions = staves
             .iter()
-            .map(|s| s.get_predict(y))
+            .map(|staff| staff.get_prediction(y))
             .collect::<Vec<(f32, f32)>>();
+
+        let positions = buff
+            .iter()
+            .enumerate()
+            .filter(|(_, v)| **v == 0)
+            .map(|(x, _)| x);
+
+        let matches = positions
+            .map(
+                |p|
+                match_position(&predictions, &p)
+            );
         
-        for (x, _, _) 
-            in pixels_chunk.iter().filter(|(_, _, v)| **v==0) {
-
-            let mut result = predicts
-                .iter()
-                .map(|(pre, acc)| ((*x as f32 - pre).abs(), acc))
-                .filter(|(diff, _)| *diff <= 1.0)
-                .collect::<Vec<(f32, &f32)>>();
-                
-            result.sort_by(|a,b| a.1.partial_cmp(b.1).unwrap());
-
-            result.first();
+        for (key, res) in matches.enumerate() {
+            match res {
+                None => (), //staves.push()
+                Some(id) => () //staves[id].add( (position[k], y) )
+            }
         }
 
     }
 
-    /*
-- Boucler par colonne (split, slice..)
-- Calculer les predictions
-- Pour chaque point de la colonne : (y <= (prediction + moitié de la dernière section) <= y+1) et le plus horizontal possible => iter => filter => sort
-- 
-    */
+
 
 /*
     while let Some(point) = iter.next() {
@@ -167,30 +161,13 @@ fn match_position(predictions: &Vec<(f32, f32)>, position: &usize) -> Option<usi
     }
 }
 
-fn match_positions(predictions: &Vec<(f32, f32)>, positions: &Vec<usize>) -> Vec<Option<usize>> {
-    positions
-        .iter()
-        .map(
-            |p|
-            match_position(predictions, p)
-        )
-        .collect()
-}
+
 
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test]
-    fn test_match_positions_allow_multiple_matching() {
-        let predictions = vec![            
-            (0.0, 0.0),            
-            (5.0, 0.0),
-            (2.0, 0.0)                   
-        ];
-        let positions = vec![1, 2, 3, 7];
-        assert_eq!(match_positions(&predictions, &positions), vec![Some(0), Some(2), Some(2), None]);
-    }
+
     #[test]
     fn test_match_position_foster_horizontality() {
         let predictions = vec![
@@ -248,29 +225,13 @@ mod tests {
     }
 }
 
-#[derive(Debug)]
-struct Section {
-    x: usize,    
-    y: usize,
-    height: usize
-}
-
-impl Section {
-    fn new(x: usize, y: usize, height: usize) -> Section {        
-        Section {
-            x,
-            y,
-            height
-        }
-    }
-}
 
 
 #[derive(Debug)]
 struct Staff {
     x: kalman::M2x1,
     p: kalman::M2x2,
-    buffer: Vec<Section>
+    buffer: Vec<(usize, Vec<usize>)>
 }
 /*
 impl Ord for Staff {
@@ -296,17 +257,17 @@ impl PartialEq for Staff {
 */
 
 impl Staff {
-    fn new(section: Section) -> Staff {        
+    fn new() -> Staff {        
         Staff {
             x: (
-                ((section.x + section.height/2) as f32,),
+                (0.0,),
                 (0.0,)
             ),
             p: (
                 (1.0, 0.0),
                 (0.0, 1.0)
             ),
-            buffer: vec![section]
+            buffer: vec![]
         }
     }
     
@@ -320,14 +281,8 @@ impl Staff {
     );
 
 
-    /*
-    - calculer la prédiction pour la colonne y
-    - retourner la prédiction et l'inclinaison en absolu (0->inf) 1 / x+1
-    - 
-    */
-
-    fn get_predict(&self, y: usize) -> (f32, f32) {
-        let last_y = &self.buffer.last().unwrap().y;
+    fn get_prediction(&self, y: usize) -> (f32, f32) {
+        let last_y = &self.buffer.last().unwrap().0;
         let a = (
             (1.0, (y - *last_y) as f32),
             (0.0, 1.0)
@@ -335,29 +290,8 @@ impl Staff {
         let (t_x, _) = kalman::predict(&self.x, &self.p, &a);
         (t_x.0.0, t_x.1.0)
     }
-/*
-    fn check_pixel(&self, pixel: (usize, usize)) -> bool {
-        
-        let last_width = &self.buffer.last().unwrap().1;
 
-        if *last_width == pixel.1 || !self.active {
-            false
-        } else {
-            let a = (
-                (1.0, (pixel.1 as f32 - *last_width as f32)),
-                (0.0, 1.0)
-            );
-            
-            let (t_x, _) = kalman::predict(&self.x, &self.p, &a);
-   
-            let diff = (t_x.0.0 - pixel.0 as f32).abs();    
-
-            diff < 2.0
-        }
-        
-    }
-
-
+/* 
     fn add_pixel(&mut self, pixel: (usize, usize)) {
     
         let last_pixel = &self.buffer.last().unwrap();
