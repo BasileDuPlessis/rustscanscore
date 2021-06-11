@@ -1,3 +1,4 @@
+use std::ops::IndexMut;
 use std::usize;
 use std::cmp::Ordering;
 
@@ -46,79 +47,53 @@ fn main() {
 */
 
 
-    let staves = Vec::<Staff>::new();
+    let mut staves = Vec::<Staff>::new();
 
 
     for (y, buff) in buffer_x.chunks(height).enumerate() {
         
-        let predictions = staves
+        let staff_predictions = staves
             .iter()
             .map(|staff| staff.get_prediction(y))
             .collect::<Vec<(f32, f32)>>();
 
-        let positions = buff
+        let pixel_positions = buff
             .iter()
             .enumerate()
             .filter(|(_, v)| **v == 0)
-            .map(|(x, _)| x);
+            .map(|(x, _)| x)
+            .collect::<Vec<usize>>();
 
-        let matches = positions
+        let matches = pixel_positions
+            .iter()
             .map(
                 |p|
-                match_position(&predictions, &p)
-            );
+                match_position(&staff_predictions, &p)
+            )
+            .collect::<Vec<Option<usize>>>();
+
+        matches
+            .iter()
+            .enumerate()
+            .filter(|(_, opt)| opt.is_some())
+            .for_each(|(i, opt)| {
+                staves[opt.unwrap()].add_pixel(pixel_positions[i], y)
+            });
+
+        let unmatched_pixels = matches
+            .iter()
+            .enumerate()    
+            .filter(|(_, opt)| opt.is_none())
+            .map(|(i, _)| pixel_positions[i])
+            .collect::<Vec<usize>>();
         
-        for (key, res) in matches.enumerate() {
-            match res {
-                None => (), //staves.push()
-                Some(id) => () //staves[id].add( (position[k], y) )
-            }
+        for xs in group_by_consecutive_value(unmatched_pixels) {
+            staves.push(Staff::new(xs, y))
         }
 
     }
 
 
-
-/*
-    while let Some(point) = iter.next() {
-
-        if *point.1 != 0 {continue;}
-        
-        let pixel = (point.0 % height, point.0 / height);
-
-        
-        staves.iter_mut().for_each(|s| s.set_distance(pixel));
-        staves.sort();
-
-
-        match staves.iter_mut().find(|s| s.check_pixel(pixel)) {
-            None => staves.push(Staff::new(pixel)),
-            Some(staff) => staff.add_pixel(pixel)
-        }
-
-        loop {
-            match iter.peek() {
-                Some(p) if *p.1==0 => iter.next(),
-                _ => break
-            };
-        }
-
-    }
-   
-    for s in staves.iter() {
-        println!("{:?}\n", s);
-       if s.buffer.len() > width / 2 && s.active {
-            for mut idx in s.buffer.iter().map(|t| t.1*height + t.0) {               
-                while buffer_height[idx] == 0 {
-                    buffer_height[idx] = 120;
-                    idx = idx+1;
-                    break;
-                }
-            }
-       }
-    }
-    */
-  
     //println!("{:?}", staves);
     for (id, y) in buffer_x.iter().enumerate() {
         buffer_y[buffer_id_swap(id, height, width)] = *y;
@@ -161,12 +136,61 @@ fn match_position(predictions: &Vec<(f32, f32)>, position: &usize) -> Option<usi
     }
 }
 
+fn group_by_consecutive_value(vec: Vec<usize>) -> Vec<Vec<usize>> {
+    let mut res:Vec<Vec<usize>> = Vec::new();
 
+    if vec.len() > 0 {
+        res.push(vec![vec[0]]);
+    }    
+
+    for s in vec.windows(2) {         
+        match s {
+            [current, next] if next-current==1 => 
+                match res.last_mut() {
+                    Some(last) => last.push(*next),
+                    _ => ()
+                },
+            [_, next] => res.push(vec![*next]),
+            _ => ()
+        }
+    }
+    res
+}
 
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_group_by_consecutive_value() {
+        let vec = vec![0,2,3,4,6,7];
+        let res= vec![
+            vec![0],
+            vec![2, 3, 4],
+            vec![6, 7]
+        ];
+
+        assert_eq!(group_by_consecutive_value(vec), res);
+    }
+
+    #[test]
+    fn test_group_by_consecutive_value_handle_one_value() {
+        let vec = vec![0];
+        let res= vec![
+            vec![0]
+        ];
+
+        assert_eq!(group_by_consecutive_value(vec), res);
+    }
+
+    #[test]
+    fn test_group_by_consecutive_value_return_empty_for_empty() {
+        let vec = vec![];
+        let res: Vec<Vec<usize>> = Vec::new();
+
+        assert_eq!(group_by_consecutive_value(vec), res);
+    }
 
     #[test]
     fn test_match_position_foster_horizontality() {
@@ -231,43 +255,22 @@ mod tests {
 struct Staff {
     x: kalman::M2x1,
     p: kalman::M2x2,
-    buffer: Vec<(usize, Vec<usize>)>
+    buffer: Vec<(Vec<usize>, usize)>
 }
-/*
-impl Ord for Staff {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.distance.cmp(&other.distance)
-    }
-}
-
-impl PartialOrd for Staff {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Eq for Staff {
-}
-
-impl PartialEq for Staff {
-    fn eq(&self, other: &Self) -> bool {
-        self.distance == other.distance
-    }
-}
-*/
 
 impl Staff {
-    fn new() -> Staff {        
+    fn new(xs: Vec<usize>, y: usize) -> Staff {   
+        let mean: f32 = xs.iter().sum::<usize>() as f32 / xs.len() as f32;
         Staff {
             x: (
-                (0.0,),
+                (mean,),
                 (0.0,)
             ),
             p: (
                 (1.0, 0.0),
                 (0.0, 1.0)
             ),
-            buffer: vec![]
+            buffer: vec![(xs, y)]
         }
     }
     
@@ -282,7 +285,7 @@ impl Staff {
 
 
     fn get_prediction(&self, y: usize) -> (f32, f32) {
-        let last_y = &self.buffer.last().unwrap().0;
+        let last_y = &self.buffer.last().unwrap().1;
         let a = (
             (1.0, (y - *last_y) as f32),
             (0.0, 1.0)
@@ -290,6 +293,15 @@ impl Staff {
         let (t_x, _) = kalman::predict(&self.x, &self.p, &a);
         (t_x.0.0, t_x.1.0)
     }
+
+    fn add_pixel(&mut self, x: usize, y: usize) {
+        for t in self.buffer.iter_mut() {
+            if t.1 == y {
+                t.0.push(x);
+            }
+        }
+    }
+
 
 /* 
     fn add_pixel(&mut self, pixel: (usize, usize)) {
