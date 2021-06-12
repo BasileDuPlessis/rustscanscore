@@ -72,13 +72,16 @@ fn main() {
             )
             .collect::<Vec<Option<usize>>>();
 
-        matches
-            .iter()
+        let matched_pixels = matches.iter()
             .enumerate()
             .filter(|(_, opt)| opt.is_some())
-            .for_each(|(i, opt)| {
-                staves[opt.unwrap()].add_pixel(pixel_positions[i], y)
-            });
+            .map(|(i, opt)| (pixel_positions[i], opt.unwrap()))
+            .collect::<Vec<(usize, usize)>>();
+
+        for (s, xs) in group_by_equal_value(matched_pixels) {
+            staves[s].add_pixels(xs, y);
+        }
+        
 
         let unmatched_pixels = matches
             .iter()
@@ -87,7 +90,7 @@ fn main() {
             .map(|(i, _)| pixel_positions[i])
             .collect::<Vec<usize>>();
         
-        for xs in group_by_consecutive_value(unmatched_pixels) {
+        for xs in group_by_incremental_values(unmatched_pixels) {
             staves.push(Staff::new(xs, y))
         }
 
@@ -136,7 +139,7 @@ fn match_position(predictions: &Vec<(f32, f32)>, position: &usize) -> Option<usi
     }
 }
 
-fn group_by_consecutive_value(vec: Vec<usize>) -> Vec<Vec<usize>> {
+fn group_by_incremental_values(vec: Vec<usize>) -> Vec<Vec<usize>> {
     let mut res:Vec<Vec<usize>> = Vec::new();
 
     if vec.len() > 0 {
@@ -157,10 +160,82 @@ fn group_by_consecutive_value(vec: Vec<usize>) -> Vec<Vec<usize>> {
     res
 }
 
+fn group_by_equal_value(vec: Vec<(usize, usize)>) -> Vec<(usize, Vec<usize>)> {
+    let mut res:Vec<(usize, Vec<usize>)> = Vec::new();
+       
+    let mut iter = vec;
+    
+    iter.sort_by(
+        |a, b| 
+        a.1.partial_cmp(&b.1)
+        .unwrap_or(std::cmp::Ordering::Equal)
+    );
+
+    if iter.len() > 0 {
+        res.push((iter[0].1, vec![iter[0].0]));
+    }
+
+    for s in iter.windows(2) {
+        match s {
+            [current, next] if current.1==next.1 =>
+                match res.last_mut() {
+                    Some(last) => last.1.push(next.0),
+                    _ => ()
+                },
+            [_, next] => res.push((next.1, vec![next.0])),
+            _ => ()
+         }
+    }
+
+    res
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_group_by_equal_value_sort_values() {
+        let vec = vec![
+            (4, 3),
+            (3, 4),
+            (2, 3),
+            (1, 4)
+        ];
+        let res= vec![
+            (3, vec![4,2]),
+            (4, vec![3,1])         
+        ];
+
+        assert_eq!(group_by_equal_value(vec), res);
+    }
+
+    #[test]
+    fn test_group_by_equal_value_sort_values_2() {
+        let vec = vec![
+            (0, 4),
+            (3, 4),
+            (2, 4),
+            (1, 3),
+            (8, 4),
+        ];
+        let res= vec![
+            (3, vec![1]),
+            (4, vec![0,3,2,8])         
+        ];
+
+        assert_eq!(group_by_equal_value(vec), res);
+    }
+
+    #[test]
+    fn test_group_by_equal_value_return_empty_if_empty() {
+        let vec = Vec::new();
+        let res= Vec::new();
+
+        assert_eq!(group_by_equal_value(vec), res);
+    }
+
+
 
     #[test]
     fn test_group_by_consecutive_value() {
@@ -171,7 +246,7 @@ mod tests {
             vec![6, 7]
         ];
 
-        assert_eq!(group_by_consecutive_value(vec), res);
+        assert_eq!(group_by_incremental_values(vec), res);
     }
 
     #[test]
@@ -181,7 +256,7 @@ mod tests {
             vec![0]
         ];
 
-        assert_eq!(group_by_consecutive_value(vec), res);
+        assert_eq!(group_by_incremental_values(vec), res);
     }
 
     #[test]
@@ -189,7 +264,7 @@ mod tests {
         let vec = vec![];
         let res: Vec<Vec<usize>> = Vec::new();
 
-        assert_eq!(group_by_consecutive_value(vec), res);
+        assert_eq!(group_by_incremental_values(vec), res);
     }
 
     #[test]
@@ -294,12 +369,14 @@ impl Staff {
         (t_x.0.0, t_x.1.0)
     }
 
-    fn add_pixel(&mut self, x: usize, y: usize) {
+    fn add_pixels(&mut self, xs: Vec<usize>, y: usize) {
+        /*
         for t in self.buffer.iter_mut() {
             if t.1 == y {
                 t.0.push(x);
             }
         }
+         */
     }
 
 
