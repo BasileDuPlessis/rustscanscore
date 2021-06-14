@@ -9,60 +9,40 @@ mod simulator;
 fn main() {
 
     let img = image::open("score_sample/score_sample2.png").unwrap();
-    let gray = img.into_luma8();
+    let img_gray = img.into_luma8();
 
-    let width = gray.width() as usize;
-    let height = gray.height() as usize;
+    let width = img_gray.width() as usize;
+    let height = img_gray.height() as usize;
     let buffer_size = width * height;
 
 
-    let mut buffer_x = vec![255; buffer_size];
-    let mut buffer_y = vec![255; buffer_size];
+    let mut buffer_vertical = vec![255; buffer_size];
 
   
-    for id_x in 1..(buffer_size-1) {
-        let prev_id_y = buffer_id_swap(id_x-1, height, width);
-        let next_id_y = buffer_id_swap(id_x+1, height, width);
-
-        let diff:i32 = 
-            *gray.get(prev_id_y).unwrap() as i32
-            -
-            *gray.get(next_id_y).unwrap() as i32;
-
-        if diff > 40  {
-            buffer_x[id_x] = 0;
-        }
-    }
-
- /*
-    buffer_height[1265] = 0;
-    buffer_height[1413] = 0;
-    buffer_height[1560] = 0;
-    buffer_height[1855] = 0;
-    buffer_height[3777] = 0;
-    buffer_height[3926] = 0;
-    buffer_height[4075] = 0;
-    buffer_height[4224] = 0;
-    buffer_height[4373] = 0;
-*/
-
+    for id_horizontal in 0..(buffer_size-1) {
+        let id_vertical = buffer_id_swap(id_horizontal, width, height);
+        buffer_vertical[id_vertical] = *img_gray.get(id_horizontal).unwrap_or(&255);
+    }     
 
     let mut staves = Vec::<Staff>::new();
 
-
-    for (y, buff) in buffer_x.chunks(height).enumerate() {
-        
-        let staff_predictions = staves
-            .iter()
-            .map(|staff| staff.get_prediction(y))
-            .collect::<Vec<(f32, f32)>>();
+    for (y, buff) in buffer_vertical.chunks(height).enumerate() {
 
         let pixel_positions = buff
             .iter()
             .enumerate()
             .filter(|(_, v)| **v == 0)
-            .map(|(x, _)| x)
+            .map(|(x, _)| x + 1)
             .collect::<Vec<usize>>();
+
+        if pixel_positions.len() == 0 {continue;}
+
+        let y = y + 1;
+        
+        let staff_predictions = staves
+            .iter()
+            .map(|staff| staff.get_prediction(y))
+            .collect::<Vec<(f32, f32)>>();
 
         let matches = pixel_positions
             .iter()
@@ -79,10 +59,9 @@ fn main() {
             .collect::<Vec<(usize, usize)>>();
 
         for (s, xs) in group_by_equal_value(matched_pixels) {
-            staves[s].add_pixels(xs, y);
+            staves[s].push_pixels(xs, y);
         }
         
-
         let unmatched_pixels = matches
             .iter()
             .enumerate()    
@@ -97,14 +76,16 @@ fn main() {
     }
 
 
-    //println!("{:?}", staves);
+    println!("{:?}", staves);
+
+    /*
     for (id, y) in buffer_x.iter().enumerate() {
         buffer_y[buffer_id_swap(id, height, width)] = *y;
     }
 
     image::save_buffer("score_sample/binary_score.png", &buffer_y, width as u32, height as u32, image::ColorType::L8).unwrap();
     
-    /*
+    
     match simulator::line() {
         Err(e) => println!("{:?}", e),
         _ => ()
@@ -325,7 +306,6 @@ mod tests {
 }
 
 
-
 #[derive(Debug)]
 struct Staff {
     x: kalman::M2x1,
@@ -360,55 +340,50 @@ impl Staff {
 
 
     fn get_prediction(&self, y: usize) -> (f32, f32) {
-        let last_y = &self.buffer.last().unwrap().1;
+        let last_y = self.buffer.last().unwrap().1;
         let a = (
-            (1.0, (y - *last_y) as f32),
+            (1.0, (y - last_y) as f32),
             (0.0, 1.0)
         );        
         let (t_x, _) = kalman::predict(&self.x, &self.p, &a);
         (t_x.0.0, t_x.1.0)
     }
 
-    fn add_pixels(&mut self, xs: Vec<usize>, y: usize) {
-        /*
-        for t in self.buffer.iter_mut() {
-            if t.1 == y {
-                t.0.push(x);
-            }
-        }
-         */
-    }
+    fn push_pixels(&mut self, xs: Vec<usize>, y: usize) {
+        
+        let default = (xs.clone(), y.clone());
 
+        let last_pixels = self.buffer.last().unwrap_or(&default);
 
-/* 
-    fn add_pixel(&mut self, pixel: (usize, usize)) {
-    
-        let last_pixel = &self.buffer.last().unwrap();
+        let x_mean = xs.iter().sum::<usize>() as f32 / xs.len() as f32;
+        let last_x_mean = last_pixels.0.iter().sum::<usize>() as f32 / last_pixels.0.len() as f32;
 
         let a = (
-            (1.0, pixel.1 as f32 - last_pixel.1 as f32),
+            (1.0,  y as f32 - last_pixels.1 as f32),
             (0.0, 1.0)
         );
-        let (t_x, t_p) = kalman::predict(&self.x, &self.p, &a);
+
+        let (t_x, t_p) =
+            kalman::predict(&self.x, &self.p, &a);
         
-        let speed = (pixel.0 as f32 - last_pixel.0 as f32) / (pixel.1 as f32 - last_pixel.1 as f32);
+        let speed = 
+            x_mean - last_x_mean
+            /
+            (y as f32 - last_pixels.1 as f32);
 
-       
-
-        let y = ( 
-            (pixel.0 as f32, ),
+        let measure = ( 
+            (x_mean as f32, ),
             (speed, )
         );
 
-        let (t_x, t_p) = kalman::update(&t_x, &t_p, &y, &Staff::H, &Staff::R);   
+        let (t_x, t_p) =
+            kalman::update(&t_x, &t_p, &measure, &Staff::H, &Staff::R);   
         
         self.x = t_x;
         self.p = t_p;
 
-        self.buffer.push(pixel);
+        self.buffer.push((xs, y));
 
-
-        if self.x.1.0.abs() > 0.5 && self.buffer.len() > 2 {self.active = false;}
     }
-    */
+
 }
