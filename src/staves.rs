@@ -1,3 +1,4 @@
+#[derive(Debug)]
 struct Prediction {    
     from_y: f32,
     x: f32,
@@ -14,7 +15,9 @@ pub struct Staff {
 impl Staff {
 
     fn new(xs: Vec<usize>, y: usize) -> Staff {   
-        let mean: f32 = xs.iter().sum::<usize>() as f32 / xs.len() as f32;
+        
+        let mean = Staff::get_mean(&xs).unwrap();
+
         Staff {
             x: (
                 (mean,),
@@ -62,8 +65,8 @@ impl Staff {
 
         let last_pixels = self.buffer.last().unwrap_or(&default);
 
-        let x_mean = xs.iter().sum::<usize>() as f32 / xs.len() as f32;
-        let last_x_mean = last_pixels.0.iter().sum::<usize>() as f32 / last_pixels.0.len() as f32;
+        let x_mean = Staff::get_mean(&xs).unwrap();
+        let last_x_mean = Staff::get_mean(&last_pixels.0).unwrap();
 
         let a = (
             (1.0,  y as f32 - last_pixels.1 as f32),
@@ -93,6 +96,18 @@ impl Staff {
 
     }
 
+    fn get_mean(xs: &Vec<usize>) -> Option<f32> {
+        let len = xs.len() as f32;
+        match xs.as_slice() {
+            [] => None,
+            _ => Some(
+                (xs.iter().sum::<usize>() as f32 + len * 0.5)
+                /
+                len
+            )
+        }        
+    }
+
 }
 
 pub fn detect_staves(buffer_vertical:Vec<u8>, height: usize) -> Vec<Staff> {
@@ -115,6 +130,8 @@ pub fn detect_staves(buffer_vertical:Vec<u8>, height: usize) -> Vec<Staff> {
             .iter()
             .map(|staff| staff.get_prediction(y))
             .collect::<Vec<Prediction>>();
+        
+            println!("{:?}", staff_predictions);
 
         let matches = pixel_positions
             .iter()
@@ -133,6 +150,8 @@ pub fn detect_staves(buffer_vertical:Vec<u8>, height: usize) -> Vec<Staff> {
         for (s, xs) in group_by_equal_value(matched_pixels) {
             staves[s].push_pixels(xs, y);
         }
+
+        
         
         let unmatched_pixels = matches
             .iter()
@@ -151,18 +170,16 @@ pub fn detect_staves(buffer_vertical:Vec<u8>, height: usize) -> Vec<Staff> {
     
 }
 
-
-
 fn match_position(predictions: &Vec<Prediction>, x: &usize, y: &usize) -> Option<usize> {
     let mut result = predictions
         .iter()
         .enumerate()
-        .filter(|(_, pred)| (*x as f32 - pred.x.round()).abs() <= 1.0)
+        .filter(|(_, pred)| (*x as f32 + 0.5 - pred.x).abs() <= 1.1)
         .map(
             |(id, pred)|
             (id, *y as f32 - pred.from_y, pred.bias))
         .collect::<Vec<(usize, f32, f32)>>();
-   
+
     result.sort_by(
         |a,b| 
         a.1
@@ -308,6 +325,19 @@ mod tests {
     }
 
     #[test]
+    fn test_match_position_use_pixel_center() {
+        let predictions = vec![
+            Prediction {x: 5.0, from_y: 1.0, bias: 0.0},       
+        ];
+        let x = 4;
+        let y = 2;
+        assert_eq!(match_position(&predictions, &x, &y), Some(0));
+        let x = 6;
+        let y = 2;
+        assert_eq!(match_position(&predictions, &x, &y), None);
+    }
+
+    #[test]
     fn test_match_position_foster_continuity_and_horizontality() {
         let predictions = vec![
             Prediction {x: 1.0, from_y: 1.0, bias: 1.0},
@@ -319,20 +349,20 @@ mod tests {
     }
      
     #[test]
-    fn test_match_position_round_predicition() {
+    fn test_match_position_accept_dot_one_pixel_gap() {
         let predictions = vec![
-            Prediction {x: 0.49, from_y: 1.0, bias: 0.0},
+            Prediction {x: 2.4, from_y: 1.0, bias: 0.0},
         ];
-        let x = 2;
-        let y = 2;
-        assert_eq!(match_position(&predictions, &x, &y), None);
-
-        let predictions = vec![
-            Prediction {x: 0.50, from_y: 1.0, bias: 0.0},
-        ];
-        let x = 2;
+        let x = 3;
         let y = 2;
         assert_eq!(match_position(&predictions, &x, &y), Some(0));
+
+        let predictions = vec![
+            Prediction {x: 2.39, from_y: 1.0, bias: 0.0},
+        ];
+        let x = 3;
+        let y = 2;
+        assert_eq!(match_position(&predictions, &x, &y), None);
     }
     #[test]
     fn test_match_position_disadvantage_distant_staff() {
@@ -347,12 +377,12 @@ mod tests {
     #[test]
     fn test_match_position_follow_sorting_in_eq_condition() {
         let pred1 = vec![      
-            Prediction {x: 3., from_y: 1.0, bias: 0.0},    
-            Prediction {x: 1., from_y: 1.0, bias: 0.0}  
+            Prediction {x: 2., from_y: 1.0, bias: 0.0},    
+            Prediction {x: 1.5, from_y: 1.0, bias: 0.0}  
         ];
         let pred2 = vec![        
-            Prediction {x: 1., from_y: 1.0, bias: 0.0},
-            Prediction {x: 3., from_y: 1.0, bias: 0.0}
+            Prediction {x: 1.5, from_y: 1.0, bias: 0.0},
+            Prediction {x: 2., from_y: 1.0, bias: 0.0}
         ];
         let x = 2;
         let y = 2;
@@ -360,6 +390,15 @@ mod tests {
         assert_eq!(match_position(&pred2, &x, &y), Some(0));
     }
 
+    #[test]
+    fn test_get_mean() {
+        let buffer:Vec<usize> = vec![6,8,10];
+
+        assert_eq!(Staff::get_mean(&buffer), Some(8.));
+        let buffer:Vec<usize> = vec![1,2,3,4];
+
+        assert_eq!(Staff::get_mean(&buffer), Some(2.5));
+    }
 
    
 }
