@@ -46,7 +46,7 @@ mod tests {
         let mut buffer_vertical = vec![255; buffer_size];
     
       
-        for id_horizontal in 0..(buffer_size-1) {
+        for id_horizontal in 0..buffer_size {
             let id_vertical = buffer_id_swap(id_horizontal, width, height);
             buffer_vertical[id_vertical] = *img_gray.get(id_horizontal).unwrap_or(&255);
         }
@@ -89,7 +89,11 @@ mod tests {
 
         let staves = staves::detect_staves(buffer, height);
 
-        println!("{:?}", staves);
+        assert_eq!(staves.len(), 7);
+        assert_eq!(staves[0].buffer.len(), 10);
+        assert_eq!(staves[6].buffer[0], (vec![10], 3));
+        assert_eq!(*staves[6].buffer.last().unwrap(), (vec![10], 10));
+
     }
 
 }

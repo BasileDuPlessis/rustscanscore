@@ -130,8 +130,6 @@ pub fn detect_staves(buffer_vertical:Vec<u8>, height: usize) -> Vec<Staff> {
             .iter()
             .map(|staff| staff.get_prediction(y))
             .collect::<Vec<Prediction>>();
-        
-            println!("{:?}", staff_predictions);
 
         let matches = pixel_positions
             .iter()
@@ -392,12 +390,12 @@ mod tests {
 
     #[test]
     fn test_get_mean() {
-        let buffer:Vec<usize> = vec![6,8,10];
+        let buffer:Vec<usize> = vec![5,7,9];
 
-        assert_eq!(Staff::get_mean(&buffer), Some(8.));
+        assert_eq!(Staff::get_mean(&buffer), Some(7.5));
         let buffer:Vec<usize> = vec![1,2,3,4];
 
-        assert_eq!(Staff::get_mean(&buffer), Some(2.5));
+        assert_eq!(Staff::get_mean(&buffer), Some(3.0));
     }
 
    
