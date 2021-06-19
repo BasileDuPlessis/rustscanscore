@@ -145,7 +145,7 @@ pub fn detect_staves(buffer_vertical:Vec<u8>, height: usize) -> Vec<Staff> {
             .map(|(i, opt)| (pixel_positions[i], opt.unwrap()))
             .collect::<Vec<(usize, usize)>>();
 
-        for (s, xs) in group_by_equal_value(matched_pixels) {
+        for (s, xs) in group_by_2nd_tuple_value(matched_pixels) {
             staves[s].push_pixels(xs, y);
         }
 
@@ -158,7 +158,7 @@ pub fn detect_staves(buffer_vertical:Vec<u8>, height: usize) -> Vec<Staff> {
             .map(|(i, _)| pixel_positions[i])
             .collect::<Vec<usize>>();
         
-        for xs in group_by_incremental_values(unmatched_pixels) {
+        for xs in group_by_adjacent_values(unmatched_pixels) {
             staves.push(Staff::new(xs, y))
         }
 
@@ -194,7 +194,7 @@ fn match_position(predictions: &Vec<Prediction>, x: &usize, y: &usize) -> Option
     }
 }
 
-fn group_by_incremental_values(vec: Vec<usize>) -> Vec<Vec<usize>> {
+fn group_by_adjacent_values(vec: Vec<usize>) -> Vec<Vec<usize>> {
     let mut res:Vec<Vec<usize>> = Vec::new();
 
     if vec.len() > 0 {
@@ -215,7 +215,7 @@ fn group_by_incremental_values(vec: Vec<usize>) -> Vec<Vec<usize>> {
     res
 }
 
-fn group_by_equal_value(vec: Vec<(usize, usize)>) -> Vec<(usize, Vec<usize>)> {
+fn group_by_2nd_tuple_value(vec: Vec<(usize, usize)>) -> Vec<(usize, Vec<usize>)> {
     let mut res:Vec<(usize, Vec<usize>)> = Vec::new();
        
     let mut iter = vec;
@@ -250,7 +250,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_group_by_equal_value_sort_values() {
+    fn test_group_by_2nd_tuple_value() {
         let vec = vec![
             (4, 3),
             (3, 4),
@@ -262,11 +262,11 @@ mod tests {
             (4, vec![3,1])         
         ];
 
-        assert_eq!(group_by_equal_value(vec), res);
+        assert_eq!(group_by_2nd_tuple_value(vec), res);
     }
 
     #[test]
-    fn test_group_by_equal_value_sort_values_2() {
+    fn test_group_by_2nd_tuple_value_should_sort() {
         let vec = vec![
             (0, 4),
             (3, 4),
@@ -279,21 +279,21 @@ mod tests {
             (4, vec![0,3,2,8])         
         ];
 
-        assert_eq!(group_by_equal_value(vec), res);
+        assert_eq!(group_by_2nd_tuple_value(vec), res);
     }
 
     #[test]
-    fn test_group_by_equal_value_return_empty_if_empty() {
+    fn test_group_by_2nd_tuple_value_return_empty_if_empty() {
         let vec = Vec::new();
         let res= Vec::new();
 
-        assert_eq!(group_by_equal_value(vec), res);
+        assert_eq!(group_by_2nd_tuple_value(vec), res);
     }
 
 
 
     #[test]
-    fn test_group_by_consecutive_value() {
+    fn test_group_by_adjacent_values() {
         let vec = vec![0,2,3,4,6,7];
         let res= vec![
             vec![0],
@@ -301,25 +301,25 @@ mod tests {
             vec![6, 7]
         ];
 
-        assert_eq!(group_by_incremental_values(vec), res);
+        assert_eq!(group_by_adjacent_values(vec), res);
     }
 
     #[test]
-    fn test_group_by_consecutive_value_handle_one_value() {
+    fn test_group_by_adjacent_values_handle_one_value() {
         let vec = vec![0];
         let res= vec![
             vec![0]
         ];
 
-        assert_eq!(group_by_incremental_values(vec), res);
+        assert_eq!(group_by_adjacent_values(vec), res);
     }
 
     #[test]
-    fn test_group_by_consecutive_value_return_empty_for_empty() {
+    fn test_group_by_adjacent_values_return_empty_for_empty() {
         let vec = vec![];
         let res: Vec<Vec<usize>> = Vec::new();
 
-        assert_eq!(group_by_incremental_values(vec), res);
+        assert_eq!(group_by_adjacent_values(vec), res);
     }
 
     #[test]
@@ -381,6 +381,12 @@ mod tests {
         let buffer:Vec<usize> = vec![1,2,3,4];
 
         assert_eq!(Staff::get_mean(&buffer), Some(3.0));
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_create_empty_staff_should_panic() {
+        Staff::new(Vec::new(), 0);
     }
 
    
