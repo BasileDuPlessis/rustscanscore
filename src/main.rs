@@ -84,7 +84,7 @@ mod tests {
     }
 
     #[test]
-    fn test_full_black() {
+    fn test_full_black_handled_correctly() {
         let (buffer, _, height) = prepare_img("score_sample/full_black.png");
 
         let staves = staves::detect_staves(buffer, height);
@@ -93,6 +93,16 @@ mod tests {
         assert_eq!(staves[0].buffer.len(), 10);
         assert_eq!(staves[6].buffer[0], (vec![10], 3));
         assert_eq!(*staves[6].buffer.last().unwrap(), (vec![10], 10));
+
+    }
+
+    #[test]
+    fn test_2px_line_with_holes() {
+        let (buffer, _, height) = prepare_img("score_sample/2px_line_with_holes.png");
+
+        let staves = staves::detect_staves(buffer, height);
+
+        assert_eq!(staves.len(), 1);
 
     }
 

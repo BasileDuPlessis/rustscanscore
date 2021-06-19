@@ -172,7 +172,7 @@ fn match_position(predictions: &Vec<Prediction>, x: &usize, y: &usize) -> Option
     let mut result = predictions
         .iter()
         .enumerate()
-        .filter(|(_, pred)| (*x as f32 + 0.5 - pred.x).abs() <= 1.1)
+        .filter(|(_, pred)| (*x as f32 + 0.5 - pred.x).abs() <= 1.2)
         .map(
             |(id, pred)|
             (id, *y as f32 - pred.from_y, pred.bias))
@@ -346,22 +346,7 @@ mod tests {
         assert_eq!(match_position(&predictions, &x, &y), Some(1));
     }
      
-    #[test]
-    fn test_match_position_accept_dot_one_pixel_gap() {
-        let predictions = vec![
-            Prediction {x: 2.4, from_y: 1.0, bias: 0.0},
-        ];
-        let x = 3;
-        let y = 2;
-        assert_eq!(match_position(&predictions, &x, &y), Some(0));
-
-        let predictions = vec![
-            Prediction {x: 2.39, from_y: 1.0, bias: 0.0},
-        ];
-        let x = 3;
-        let y = 2;
-        assert_eq!(match_position(&predictions, &x, &y), None);
-    }
+  
     #[test]
     fn test_match_position_disadvantage_distant_staff() {
         let predictions = vec![
