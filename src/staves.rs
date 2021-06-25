@@ -1,3 +1,5 @@
+use log::{debug, trace};
+
 #[derive(Debug)]
 struct Prediction {    
     from_y: f32,
@@ -17,6 +19,8 @@ impl Staff {
     fn new(xs: Vec<usize>, y: usize) -> Staff {   
         
         let mean = Staff::get_mean(&xs).unwrap();
+
+        debug!("Staff created at mean position x:{:?}", mean);
 
         Staff {
             x: (
@@ -50,6 +54,8 @@ impl Staff {
         );
 
         let (t_x, _) = crate::kalman::predict(&self.x, &self.p, &a);
+
+        debug!("Staff {:?} predict x:{:?} from column:{:?}", self.x, t_x.0.0, last_y);
 
         Prediction {
             from_y: last_y,
@@ -88,6 +94,8 @@ impl Staff {
 
         let (t_x, t_p) =
         crate::kalman::update(&t_x, &t_p, &measure, &Staff::H, &Staff::R);   
+
+        debug!("Staff {:?} updated with xs:{:?} y:{:?} and become:{:?}", self.x, xs, y, t_x);
         
         self.x = t_x;
         self.p = t_p;
@@ -125,6 +133,9 @@ pub fn detect_staves(buffer_vertical:Vec<u8>, height: usize) -> Vec<Staff> {
         if pixel_positions.len() == 0 {continue;}
 
         let y = y + 1;
+
+        debug!("#################");
+        debug!("Start matching column:{:?} with pixel positions:{:?}", y, pixel_positions);
         
         let staff_predictions = staves
             .iter()
@@ -138,6 +149,9 @@ pub fn detect_staves(buffer_vertical:Vec<u8>, height: usize) -> Vec<Staff> {
                 match_position(&staff_predictions, x, &y)
             )
             .collect::<Vec<Option<usize>>>();
+
+
+        debug!("Match positions:{:?} give:{:?}", pixel_positions, matches);
 
         let matched_pixels = matches.iter()
             .enumerate()
@@ -172,21 +186,19 @@ fn match_position(predictions: &Vec<Prediction>, x: &usize, y: &usize) -> Option
     let mut result = predictions
         .iter()
         .enumerate()
-        .filter(|(_, pred)| (*x as f32 + 0.5 - pred.x).abs() <= 1.2)
+        .filter(|(_, pred)| (*x as f32 + 0.5 - pred.x).abs() <= 1.4)
         .map(
             |(id, pred)|
-            (id, *y as f32 - pred.from_y, pred.bias))
+            (id, *y as f32 - pred.from_y, pred.bias.abs()))
         .collect::<Vec<(usize, f32, f32)>>();
 
     result.sort_by(
         |a,b| 
-        a.1
-            .partial_cmp(&b.1)
-            .unwrap_or(std::cmp::Ordering::Equal)
-            .then(
-                a.2.partial_cmp(&b.2).unwrap_or(std::cmp::Ordering::Equal)
-            )
+        a.2.partial_cmp(&b.2).unwrap_or(std::cmp::Ordering::Equal)
     );
+
+    trace!("Matching x:{:?} y:{:?} from predictions:{:?} give:{:?}", x, y, predictions, result);
+
 
     match result.first() {
         None => None,
@@ -248,6 +260,8 @@ fn group_by_2nd_tuple_value(vec: Vec<(usize, usize)>) -> Vec<(usize, Vec<usize>)
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use crate::tests::init_logger;
 
     #[test]
     fn test_group_by_2nd_tuple_value() {
@@ -336,6 +350,20 @@ mod tests {
     }
 
     #[test]
+    fn test_match_position_foster_horizontality() {
+        init_logger();
+        let predictions = vec![
+            Prediction {x: 5.5, from_y: 5.0, bias: 0.0},
+            Prediction {x: 7.458883, from_y: 5.0, bias: -0.6},  
+            Prediction {x: 6.217949, from_y: 5.0, bias: -0.6666667},      
+        ];
+
+        assert_eq!(match_position(&predictions, &4, &6), Some(0));
+        assert_eq!(match_position(&predictions, &5, &6), Some(0));
+        assert_eq!(match_position(&predictions, &6, &6), Some(0));
+    }
+
+    #[test]
     fn test_match_position_foster_continuity_and_horizontality() {
         let predictions = vec![
             Prediction {x: 1.0, from_y: 1.0, bias: 1.0},
@@ -357,6 +385,7 @@ mod tests {
         let y = 3;
         assert_eq!(match_position(&predictions, &x, &y), Some(1));
     }
+
     #[test]
     fn test_match_position_follow_sorting_in_eq_condition() {
         let pred1 = vec![      

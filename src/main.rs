@@ -5,8 +5,8 @@ mod kalman;
 
 
 
+
 fn main() {
- 
 
     /*
     for (id, y) in buffer_x.iter().enumerate() {
@@ -21,7 +21,9 @@ fn main() {
         _ => ()
     };
     */
+
 }
+
 
 fn buffer_id_swap(id: usize, a: usize, b: usize) -> usize {
     let dim1 = id % a;
@@ -33,6 +35,10 @@ fn buffer_id_swap(id: usize, a: usize, b: usize) -> usize {
 mod tests {
 
     use super::*;
+
+    pub fn init_logger() {
+        let _ = env_logger::builder().is_test(true).try_init();
+    }
 
     fn prepare_img(img: &str) -> (Vec<u8>, usize, usize) {
         let img = image::open(img).unwrap();
@@ -78,7 +84,7 @@ mod tests {
         let (buffer, _, height) = prepare_img("score_sample/single_line_top.png");
 
         let staves = staves::detect_staves(buffer, height);
-
+        
         assert_eq!(staves.len(), 1);
         assert_eq!(staves[0].buffer.len(), 10);
     }
@@ -103,6 +109,28 @@ mod tests {
         let staves = staves::detect_staves(buffer, height);
 
         assert_eq!(staves.len(), 1);
+
+    }
+
+    #[test]
+    fn test_2px_line_curved() {
+        let (buffer, _, height) = prepare_img("score_sample/2px_line_curved.png");
+
+        let staves = staves::detect_staves(buffer, height);
+
+        assert_eq!(staves.len(), 1);
+
+
+    }
+
+    #[test]
+    fn test_crossed_lines() {
+        init_logger();
+        let (buffer, _, height) = prepare_img("score_sample/crossed_lines.png");
+
+        let staves = staves::detect_staves(buffer, height);
+
+        println!("{:?}", staves);
 
     }
 
